@@ -46,7 +46,7 @@ public class ReferenceCountingGC {
 ```
 运行结果：
 ```text
-[GC (System.gc()) [PSYoungGen: **8034K->624K**(76288K)] 8034K->632K(251392K), 0.0014423 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
+[GC (System.gc()) [PSYoungGen: 8034K->624K(76288K)] 8034K->632K(251392K), 0.0014423 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
 [Full GC (System.gc()) [PSYoungGen: 624K->0K(76288K)] [ParOldGen: 8K->394K(175104K)] 632K->394K(251392K), [Metaspace: 3161K->3161K(1056768K)], 0.0045513 secs] [Times: user=0.03 sys=0.00, real=0.01 secs] 
 Heap
  PSYoungGen      total 76288K, used 1966K [0x000000076ab00000, 0x0000000770000000, 0x00000007c0000000)
@@ -58,6 +58,6 @@ Heap
  Metaspace       used 3173K, capacity 4496K, committed 4864K, reserved 1056768K
   class space    used 349K, capacity 388K, committed 512K, reserved 1048576K
 ```
-从运行结果可以清楚看到内存回收日志中包含"8303K->210K"，意味着虚拟机并没有因为这两个对象互相引用就放弃回收它们，这也从侧面说明了Java虚拟机并不是通过引用计数算法来判断对象是否存活的。
+从运行结果可以清楚看到内存回收日志中包含"8034K->624K"，意味着虚拟机并没有因为这两个对象互相引用就放弃回收它们，这也从侧面说明了Java虚拟机并不是通过引用计数算法来判断对象是否存活的。
 
 ### 3.2.2 可达性分析算法

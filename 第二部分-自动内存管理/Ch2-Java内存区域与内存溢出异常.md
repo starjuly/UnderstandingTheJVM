@@ -1,7 +1,6 @@
 # 第2章 Java内存区域与内存溢出异常
 [TOC]
-
-![](pictures\jvm虚拟机运行时区域.png)
+![](pictures/jvm虚拟机运行时区域.png)
 
 ## 2.2 运行时数据区域
 
@@ -91,7 +90,6 @@ Java虚拟机在执行Java程序的过程中会把它所管理的内存划分为
   - HotSpot虚拟机默认的分配顺序为longs/doubles、ints、shorts/chars、bytes/booleans、oops (Ordinary Object Pointers, OOPs)，相同宽度的字段总是被分配到一起存放，满足这个条件的前提下，父类定义的变量会出现在子类之前。
 
 - 对齐填充（Padding）：
-  - 这部分不是必须的，它仅仅起到占位符作用。由于HotSpot虚拟机的自动内存管理系统要求对象的起始地址必须是8字节的整数倍，而对象头已经被设计成8字节的倍数，所以如果对象实例数据部分没有对齐，需要通过对齐填充来补全。
 
 ### 2.3.3 对象的访问定位
 

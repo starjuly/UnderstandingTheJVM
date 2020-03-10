@@ -458,6 +458,32 @@ if (CARD_TABLE [this address >> 9] != 0)
   而对于更大的堆内存，可重点考擦以下G1.
 - 当然，以上都是仅从理论出发的分析，实战中切不可纸上谈兵，根据系统实施情况去测试才是选择收集器的最终依据。
  
+ 
+### 虚拟机及垃圾收集器日志
+- 在JDK9后，HotSpot提供统一的日志处理框架，HotSpot所有功能的日志都放到了"-Xlog"的参数上，这个参数的能力也相应被极大扩展了。
+```text
+-Xlog[:[selector][:[output][:[decorators][:output-options]]]]
+```
+- 命令中最关键的参数是选择器（Selector），它由标签（Tag）和日志级别（Level）共同组成。标签可理解为虚拟机中某个功能模块的名字，
+它告诉日志框架用户希望得到虚拟机哪些功能的日志输出。垃圾收集器的标签名称为"gc"，由此可见，垃圾收集器日志只是HotSpot众多功能日志的其中一项。
+- 日志级别从低到高，共有Trace，Debug，Info，Warning，Error，Off六种级别，日志级别决定了输出信息的详细程度，默认级别为Info，
+HotSpot的日志规则与Log4j，SLF4j这类Java日志框架大体上是一致的。另外，还可以使用修饰器（Decorator）来要求每行日志输出都附加上额外的内容，
+支持附加在日志上的信息包括：
+  - time：当前日期和时间。
+  - uptime：虚拟机启动到现在经过的时间，以秒为单位。
+  - timemillis：当前时间的毫秒数，相当于System.currentTimeMillis()的输出。
+  - uptimemillis：虚拟机启动到现在经过的毫秒数。
+  - timenanos：当前时间的纳秒数，相当于System.nanoTime()的输出。
+  - uptimenanos：虚拟机启动到现在经过的纳秒数。
+  - pid：进程ID。
+  - tid：线程ID。
+  - level：日志级别。
+  - tags：日志输出的标签集。
+- 如果不指定，默认值是uptime、level、tags这三个。
+- 下面举几个例子，展示在JDK9统一日志框架前、后是如何获得垃圾收集器过程的相关信息，以下均已JDK9的G1收集器（JDK9下默认收集器就是G1，
+所以命令行中没有指定收集器）为例。
+  - 1）查看GC基本信息，在JDK9之前使用-XX:+PrintGC，JDK9之后使用-Xlog:gc。
+  - 2）查看GC详细信息。
 
 
 

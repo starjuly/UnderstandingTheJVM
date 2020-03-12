@@ -482,11 +482,182 @@ HotSpot的日志规则与Log4j，SLF4j这类Java日志框架大体上是一致�
 - 如果不指定，默认值是uptime、level、tags这三个。
 - 下面举几个例子，展示在JDK9统一日志框架前、后是如何获得垃圾收集器过程的相关信息，以下均已JDK9的G1收集器（JDK9下默认收集器就是G1，
 所以命令行中没有指定收集器）为例。
-  - 1）查看GC基本信息，在JDK9之前使用-XX:+PrintGC，JDK9之后使用-Xlog:gc。
-  - 2）查看GC详细信息。
+  - 1）查看GC基本信息，在JDK9之前使用-XX:+PrintGC，JDK9之后使用-Xlog:gc：
+  ```text
+    java -Xlog:gc GCTest.java                                                                                                                                     
+    [0.014s][info][gc] Using G1
+    [0.602s][info][gc] GC(0) Pause Full (System.gc()) 14M->2M(20M) 8.272ms
+    [0.609s][info][gc] GC(1) Pause Full (System.gc()) 2M->2M(14M) 7.350ms
+    [0.619s][info][gc] GC(2) Pause Full (System.gc()) 2M->2M(10M) 9.763ms
+  ```
+  - 2）查看GC详细信息，在JDK9之前使用-XX:+PrintGCDetails，在JDK9之后使用-X-log:gc*，用通配符*将GC标签下所有细分过程都打印出来，
+  如果把日志级别调整到Debug或者Trace，还将获取更多信息：
+  ```text
+    java -XX:+PrintGCDetails GCTest.java                                                                                                                          
+    [0.002s][warning][gc] -XX:+PrintGCDetails is deprecated. Will use -Xlog:gc* instead.
+    [0.009s][info   ][gc,heap] Heap region size: 1M
+    [0.013s][info   ][gc     ] Using G1
+    [0.013s][info   ][gc,heap,coops] Heap address: 0x0000000700000000, size: 4096 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+    [0.589s][info   ][gc,task      ] GC(0) Using 6 workers of 10 for full compaction
+    [0.589s][info   ][gc,start     ] GC(0) Pause Full (System.gc())
+    [0.589s][info   ][gc,phases,start] GC(0) Phase 1: Mark live objects
+    [0.591s][info   ][gc,stringtable ] GC(0) Cleaned string and symbol table, strings: 5459 processed, 12 removed, symbols: 48571 processed, 12 removed
+    [0.591s][info   ][gc,phases      ] GC(0) Phase 1: Mark live objects 1.942ms
+    [0.591s][info   ][gc,phases,start] GC(0) Phase 2: Prepare for compaction
+    [0.592s][info   ][gc,phases      ] GC(0) Phase 2: Prepare for compaction 0.610ms
+    [0.592s][info   ][gc,phases,start] GC(0) Phase 3: Adjust pointers
+    [0.593s][info   ][gc,phases      ] GC(0) Phase 3: Adjust pointers 0.941ms
+    [0.593s][info   ][gc,phases,start] GC(0) Phase 4: Compact heap
+    [0.594s][info   ][gc,phases      ] GC(0) Phase 4: Compact heap 1.076ms
+    [0.596s][info   ][gc,heap        ] GC(0) Eden regions: 15->0(6)
+    [0.596s][info   ][gc,heap        ] GC(0) Survivor regions: 0->0(0)
+    [0.596s][info   ][gc,heap        ] GC(0) Old regions: 0->6
+    [0.596s][info   ][gc,heap        ] GC(0) Humongous regions: 0->0
+    [0.596s][info   ][gc,metaspace   ] GC(0) Metaspace: 14200K->14200K(1062912K)
+    [0.596s][info   ][gc             ] GC(0) Pause Full (System.gc()) 14M->2M(20M) 7.147ms
+    [0.596s][info   ][gc,cpu         ] GC(0) User=0.02s Sys=0.01s Real=0.00s
+    [0.596s][info   ][gc,task        ] GC(1) Using 2 workers of 10 for full compaction
+    [0.596s][info   ][gc,start       ] GC(1) Pause Full (System.gc())
+    [0.596s][info   ][gc,phases,start] GC(1) Phase 1: Mark live objects
+    [0.599s][info   ][gc,stringtable ] GC(1) Cleaned string and symbol table, strings: 5447 processed, 0 removed, symbols: 48559 processed, 0 removed
+    [0.599s][info   ][gc,phases      ] GC(1) Phase 1: Mark live objects 2.560ms
+    [0.599s][info   ][gc,phases,start] GC(1) Phase 2: Prepare for compaction
+    [0.599s][info   ][gc,phases      ] GC(1) Phase 2: Prepare for compaction 0.442ms
+    [0.599s][info   ][gc,phases,start] GC(1) Phase 3: Adjust pointers
+    [0.601s][info   ][gc,phases      ] GC(1) Phase 3: Adjust pointers 1.238ms
+    [0.601s][info   ][gc,phases,start] GC(1) Phase 4: Compact heap
+    [0.602s][info   ][gc,phases      ] GC(1) Phase 4: Compact heap 0.948ms
+    [0.602s][info   ][gc,heap        ] GC(1) Eden regions: 0->0(3)
+    [0.602s][info   ][gc,heap        ] GC(1) Survivor regions: 0->0(0)
+    [0.602s][info   ][gc,heap        ] GC(1) Old regions: 6->3
+    [0.602s][info   ][gc,heap        ] GC(1) Humongous regions: 0->0
+    [0.602s][info   ][gc,metaspace   ] GC(1) Metaspace: 14200K->14200K(1062912K)
+    [0.602s][info   ][gc             ] GC(1) Pause Full (System.gc()) 2M->2M(10M) 6.079ms
+    [0.603s][info   ][gc,cpu         ] GC(1) User=0.01s Sys=0.00s Real=0.01s
+    [0.603s][info   ][gc,task        ] GC(2) Using 1 workers of 10 for full compaction
+    [0.603s][info   ][gc,start       ] GC(2) Pause Full (System.gc())
+    [0.603s][info   ][gc,phases,start] GC(2) Phase 1: Mark live objects
+    [0.608s][info   ][gc,stringtable ] GC(2) Cleaned string and symbol table, strings: 5447 processed, 0 removed, symbols: 48559 processed, 0 removed
+    [0.608s][info   ][gc,phases      ] GC(2) Phase 1: Mark live objects 5.014ms
+    [0.608s][info   ][gc,phases,start] GC(2) Phase 2: Prepare for compaction
+    [0.608s][info   ][gc,phases      ] GC(2) Phase 2: Prepare for compaction 0.754ms
+    [0.608s][info   ][gc,phases,start] GC(2) Phase 3: Adjust pointers
+    [0.611s][info   ][gc,phases      ] GC(2) Phase 3: Adjust pointers 2.747ms
+    [0.611s][info   ][gc,phases,start] GC(2) Phase 4: Compact heap
+    [0.613s][info   ][gc,phases      ] GC(2) Phase 4: Compact heap 2.177ms
+    [0.617s][info   ][gc,heap        ] GC(2) Eden regions: 0->0(3)
+    [0.617s][info   ][gc,heap        ] GC(2) Survivor regions: 0->0(0)
+    [0.617s][info   ][gc,heap        ] GC(2) Old regions: 3->3
+    [0.617s][info   ][gc,heap        ] GC(2) Humongous regions: 0->0
+    [0.617s][info   ][gc,metaspace   ] GC(2) Metaspace: 14200K->14200K(1062912K)
+    [0.617s][info   ][gc             ] GC(2) Pause Full (System.gc()) 2M->2M(10M) 14.832ms
+    [0.618s][info   ][gc,cpu         ] GC(2) User=0.03s Sys=0.00s Real=0.02s
+    [0.619s][info   ][gc,heap,exit   ] Heap
+    [0.619s][info   ][gc,heap,exit   ]  garbage-first heap   total 10240K, used 2282K [0x0000000700000000, 0x0000000800000000)
+    [0.619s][info   ][gc,heap,exit   ]   region size 1024K, 1 young (1024K), 0 survivors (0K)
+    [0.619s][info   ][gc,heap,exit   ]  Metaspace       used 14206K, capacity 14530K, committed 14720K, reserved 1062912K
+    [0.619s][info   ][gc,heap,exit   ]   class space    used 1528K, capacity 1655K, committed 1664K, reserved 1048576K
+  ```
+  - 3）查看GC前后的堆、方法区可用容量变化，在JDK9之前使用-XX:+PrintHeapAtGC，JDK9之后使用-Xlog:gc+heap=debug：
+  ```text
+  java -Xlog:gc+heap=debug GCTest.java 
+  [0.011s][info][gc,heap] Heap region size: 1M
+  [0.011s][debug][gc,heap] Minimum heap 8388608  Initial heap 268435456  Maximum heap 4294967296
+  [0.652s][debug][gc,heap] GC(0) Heap before GC invocations=0 (full 0): garbage-first heap   total 262144K, used 14336K [0x0000000700000000, 0x0000000800000000)
+  [0.652s][debug][gc,heap] GC(0)   region size 1024K, 15 young (15360K), 0 survivors (0K)
+  [0.652s][debug][gc,heap] GC(0)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.652s][debug][gc,heap] GC(0)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K
+  [0.657s][info ][gc,heap] GC(0) Eden regions: 15->0(6)
+  [0.657s][info ][gc,heap] GC(0) Survivor regions: 0->0(0)
+  [0.657s][info ][gc,heap] GC(0) Old regions: 0->6
+  [0.657s][info ][gc,heap] GC(0) Humongous regions: 0->0
+  [0.657s][debug][gc,heap] GC(0) Heap after GC invocations=1 (full 1): garbage-first heap   total 20480K, used 2285K [0x0000000700000000, 0x0000000800000000)
+  [0.657s][debug][gc,heap] GC(0)   region size 1024K, 0 young (0K), 0 survivors (0K)
+  [0.657s][debug][gc,heap] GC(0)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.657s][debug][gc,heap] GC(0)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K
+  [0.657s][debug][gc,heap] GC(1) Heap before GC invocations=1 (full 1): garbage-first heap   total 20480K, used 2285K [0x0000000700000000, 0x0000000800000000)
+  [0.657s][debug][gc,heap] GC(1)   region size 1024K, 0 young (0K), 0 survivors (0K)
+  [0.657s][debug][gc,heap] GC(1)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.657s][debug][gc,heap] GC(1)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K
+  [0.664s][info ][gc,heap] GC(1) Eden regions: 0->0(3)
+  [0.664s][info ][gc,heap] GC(1) Survivor regions: 0->0(0)
+  [0.664s][info ][gc,heap] GC(1) Old regions: 6->3
+  [0.664s][info ][gc,heap] GC(1) Humongous regions: 0->0
+  [0.664s][debug][gc,heap] GC(1) Heap after GC invocations=2 (full 2): garbage-first heap   total 10240K, used 2285K [0x0000000700000000, 0x0000000800000000)
+  [0.664s][debug][gc,heap] GC(1)   region size 1024K, 0 young (0K), 0 survivors (0K)
+  [0.664s][debug][gc,heap] GC(1)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.664s][debug][gc,heap] GC(1)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K
+  [0.664s][debug][gc,heap] GC(2) Heap before GC invocations=2 (full 2): garbage-first heap   total 10240K, used 2285K [0x0000000700000000, 0x0000000800000000)
+  [0.664s][debug][gc,heap] GC(2)   region size 1024K, 0 young (0K), 0 survivors (0K)
+  [0.664s][debug][gc,heap] GC(2)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.664s][debug][gc,heap] GC(2)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K
+  [0.674s][info ][gc,heap] GC(2) Eden regions: 0->0(3)
+  [0.674s][info ][gc,heap] GC(2) Survivor regions: 0->0(0)
+  [0.674s][info ][gc,heap] GC(2) Old regions: 3->3
+  [0.674s][info ][gc,heap] GC(2) Humongous regions: 0->0
+  [0.674s][debug][gc,heap] GC(2) Heap after GC invocations=3 (full 3): garbage-first heap   total 10240K, used 2285K [0x0000000700000000, 0x0000000800000000)
+  [0.674s][debug][gc,heap] GC(2)   region size 1024K, 0 young (0K), 0 survivors (0K)
+  [0.674s][debug][gc,heap] GC(2)  Metaspace       used 14186K, capacity 14498K, committed 14720K, reserved 1062912K
+  [0.674s][debug][gc,heap] GC(2)   class space    used 1526K, capacity 1623K, committed 1664K, reserved 1048576K  
+  ```
+  - 4）查看GC过程中用户线程并发时间及停顿时间，在JDK9之前使用-XX:+Print-GCApplicationConcurrentTime以及-XX:+PrintGCApplicationStoppedTime，JDK9之后使用-Xlog:safepoint：
+  ```text
+  java -Xlog:safepoint GCTest.java 
+  [0.131s][info][safepoint] Entering safepoint region: EnableBiasedLocking
+  [0.131s][info][safepoint] Leaving safepoint region
+  [0.131s][info][safepoint] Total time for which application threads were stopped: 0.0000875 seconds, Stopping threads took: 0.0000249 seconds
+  [0.495s][info][safepoint] Application time: 0.3610630 seconds
+  [0.495s][info][safepoint] Entering safepoint region: Deoptimize
+  [0.495s][info][safepoint] Leaving safepoint region
+  [0.495s][info][safepoint] Total time for which application threads were stopped: 0.0001419 seconds, Stopping threads took: 0.0000055 seconds
+  [0.643s][info][safepoint] Application time: 0.1483016 seconds
+  [0.643s][info][safepoint] Entering safepoint region: G1CollectFull
+  [0.649s][info][safepoint] Leaving safepoint region
+  [0.649s][info][safepoint] Total time for which application threads were stopped: 0.0057503 seconds, Stopping threads took: 0.0000048 seconds
+  [0.649s][info][safepoint] Application time: 0.0000766 seconds
+  [0.649s][info][safepoint] Entering safepoint region: G1CollectFull
+  [0.656s][info][safepoint] Leaving safepoint region
+  [0.656s][info][safepoint] Total time for which application threads were stopped: 0.0066743 seconds, Stopping threads took: 0.0000049 seconds
+  [0.656s][info][safepoint] Application time: 0.0000392 seconds
+  [0.656s][info][safepoint] Entering safepoint region: G1CollectFull
+  [0.666s][info][safepoint] Leaving safepoint region
+  [0.666s][info][safepoint] Total time for which application threads were stopped: 0.0097514 seconds, Stopping threads took: 0.0000049 seconds
+  [0.667s][info][safepoint] Application time: 0.0012239 seconds
+  [0.667s][info][safepoint] Entering safepoint region: Halt
+  ```
+  - 5）查看收集器Ergonomics机制（自动设置堆空间各分代区域大小、收集目标等内容，从Parallel收集器开始支持）自动调节的相关信息。
+  在JDK9之前使用-XX:+PrintAdaptive-SizePolicy，JDK9之后使用-Xlog:gc+ergo*=trace：
+  - 6）查看熬过收集后剩余的年龄分布信息，在JDK9前使用-XX:+PrintTenuringDistribution，JDK9之后使用-Xlog:gc+age=trace：
+  
 
+## 3.8 实战：内存分配与回收策略
 
+### 3.8.1 对象优先在Eden分配
+- 大多数情况下，对象再新生代Eden区中分配。当Eden区没有足够空间进行分配时，虚拟机将发起一次Minor GC。
+- HotSpot虚拟机提供了-XX:+PrintGCDetails这个收集器日志参数，告诉虚拟机在发生垃圾收集行为时打印内存回收日志，并且在进程退出的时候输出当前的内存区域分配情况。
+在实际的问题排查中，收集器日志常会打印到文件后通过工具进行分析，不过本节实验的日志并不多，直接阅读就能看得很清楚。
+- 在代码清单3-7的testAllocation()方法中，尝试分配三个2MB大小和一个4MB大小的对象，在运行时通过-Xms20M、-Xmx20M、-Xmn10M这三个参数限制了Java堆大小为20MB，
+不可扩展，其中10MB分配给新生代，剩下的10MB分配给老年代。-XX:SurvivorRatio=8决定了新生代中Eden区与一个Survivor区的空间比例是8：1，
+从输出的结果也清晰地看到"eden space 8192K、from space 1024K、to space 1024K"的信息，新生代总可用空间为9216KB（Eden区+1个Survivor区的总容量）。
+- 执行的testAllocation()中分配allocation4对象的语句时会发生一次Minor GC，这次回收的结果是新生代6651KB变为148KB，而总内存占用量几乎没有减少
+（因为allocation1、2、3三个对象都是存活的，虚拟机几乎没有找到可回收的对象）。产生这次垃圾收集的原因是为allocation4分配内存时，发现Eden已被占用了6MB，
+剩余空间不足以分配allocation4所需的4MB内存，因此发生Minor GC。垃圾收集期间虚拟机又发现已有的三个2MB大小的对象全部无法放入Survivor空间（Survivor空间只有1MB大小），
+所以只好是Eden占用4MB（被allocation4占用），Survivor空闲，老年代被占用6MB（被allocation1、2、3占用）。通过GC日志可以证实这一点。
+```java
+    private static final int _1MB = 1024 * 1024;
 
+    /**
+     * VM参数：-verbose:gc  -Xms20M -Xmx20M -Xmn10M -XX:+PrintGCDetails -XX:SurvivorRatio=8
+     */
+    public static void testAllocation() {
+        byte[] allocation1, allocation2, allocation3, allocation4;
+        allocation1 = new byte[2 * _1MB];
+        allocation2 = new byte[2 * _1MB];
+        allocation3 = new byte[2 * _1MB];
+        // 出现一次Minor GC
+        allocation4 = new byte[4 * _1MB];
+    }
+```
 
 
 

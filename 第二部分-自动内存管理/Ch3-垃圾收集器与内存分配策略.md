@@ -631,6 +631,8 @@ HotSpot的日志规则与Log4j，SLF4j这类Java日志框架大体上是一致�
   
 
 ## 3.8 实战：内存分配与回收策略
+- 本节验证实际是使用Serial加Serial  Old客户端默认收集器组合下的内存分配和回收策略。这种配置收集器组合也许是开发人员做研发时的默认组合
+（其实现在研发时也默认使用服务端虚拟机了），但在生产环境中一般不会这样用。
 
 ### 3.8.1 对象优先在Eden分配
 - 大多数情况下，对象再新生代Eden区中分配。当Eden区没有足够空间进行分配时，虚拟机将发起一次Minor GC。
@@ -643,7 +645,8 @@ HotSpot的日志规则与Log4j，SLF4j这类Java日志框架大体上是一致�
 （因为allocation1、2、3三个对象都是存活的，虚拟机几乎没有找到可回收的对象）。产生这次垃圾收集的原因是为allocation4分配内存时，发现Eden已被占用了6MB，
 剩余空间不足以分配allocation4所需的4MB内存，因此发生Minor GC。垃圾收集期间虚拟机又发现已有的三个2MB大小的对象全部无法放入Survivor空间（Survivor空间只有1MB大小），
 所以只好是Eden占用4MB（被allocation4占用），Survivor空闲，老年代被占用6MB（被allocation1、2、3占用）。通过GC日志可以证实这一点。
-```java
+- 代码清单 3-7 对象优先在Eden分配
+```text
     private static final int _1MB = 1024 * 1024;
 
     /**
@@ -658,14 +661,133 @@ HotSpot的日志规则与Log4j，SLF4j这类Java日志框架大体上是一致�
         allocation4 = new byte[4 * _1MB];
     }
 ```
+![](./pictures/testAllocation.JPG)
 
 
+### 3.8.2 大对象直接进入老年代
+- 大对象就是指需要大量连续内存空间的Java对象，最典型的大对象便是那种很长的字符串，或者元素数量很庞大的数组，本节例子中的byte[]数组就是典型的大对象。
+大对象对虚拟机的内存分配来说就是一个不折不扣的坏消息，比遇到一个大对象更加坏的消息就是遇到一群”朝生夕灭“的”短命大对象“，我们写程序的时候应该注意避免。
+在Java虚拟机中要避免大对象的原因是，在分配内存空间时，它容易导致内存明明还有不少空间时就提前触发垃圾收集，以获取足够的连续空间才能安置好它们，而当复制对象时，
+大对象就意味着高额的内存复制开销。HotSpot虚拟机提供了-XX:PretenureSizeThreshold参数，指定大于该设置值的对象直接在老年代分配，
+这样做的目的就是避免在Eden区及两个Survivor区之间来回复制，产生大量的内存复制操作。
+- 执行代码清单3-8中的testPretenureSizeThreshold()方法后，我们看到Eden空间几乎没有被使用，而老年代的10MB空间使用了40%，也就是4MB的allocation对象直接就分配在老年代中，
+这是因为-XX:PretenureSizeThreshold被设置为3MB（就是3145728，这个参数不能与-Xmx之类的参数一样直接写3MB），因此超过3MB的对象都会直接在老年代进行分配。
+- 代码清单 3-8 大对象直接进入老年代
+```text
+    private static final int _1MB = 1024 * 1024;
 
+    /**
+     * VM参数：-verbose:gc  -Xms20M -Xmx20M -Xmn10M -XX:+PrintGCDetails -XX:SurvivorRatio=8
+     * -XX:PretenureSizeThreshold=3145728
+     */
+    public static void testPretenureSizeThreshold() {
+        byte[] allocation;
+        // 直接分配在老年代中
+        allocation = new byte[4 * _1MB];
+    }
+```
+![](./pictures/testPretenureSizeThreshold.JPG)
 
+### 3.8.3 长期存活的对象进入老年代
+- HotSpot虚拟机中多数收集器都采用了分代收集来管理堆内存，那内存回收就必须能决策哪些存活对象应当放在新生代，哪些存活对象放在老年代中。
+为做到这点，虚拟机给每个对象定义了一个对象年龄（Age）计数器，存储在对象头中（详见第2章）。对象通常在Eden区里诞生，如果经过第一次Minor GC后仍然存活，并且能被Survivor容纳的话，
+该对象会被移动到Survivor空间中，年龄就增加一岁，当它的年龄增加到一定程度（默认为15），就会被晋升到老年代中。对象晋升老年代的年龄阀值，可以通过参数-XX:MaxTenuringThreshold设置。
+- 读者可以试试分别以-XX:MaxTenuringThreshold=1和-XX:MaxTenuringThreshold=15两种设置来执行代码清单3-9中的testTenuringThreshold()方法，此方法中allocation1对象需要256KB内存，
+Survivor空间可以容纳。当-XX:MaxTenuringThreshold=1时，allocation1对象在第二次GC发生时进入老年代，新生代已使用的内存在垃圾收集以后非常干净地变成0KB。而当-XX:MaxTenuringThreshold=15时，
+第二次GC发生后，allocation1对象则还留在新生代Survivor空间，这时候新生代仍然有404KB被占用。
+- 代码清单 3-9 长期存活的对象进入老年代
+```text
+    private static final int _1MB = 1024 * 1024;
 
+    /**
+     * VM参数：-verbose:gc  -Xms20M -Xmx20M -Xmn10M -XX:+PrintGCDetails -XX:SurvivorRatio=8
+     * -XX:MaxTenuringThreshold=1 -XX:+PrintTenuringDistribution
+     */
+    public static void testTenuringThreshold() {
+        byte[] allocation1, allocation2, allocation3;
+        // 什么时候进入老年代决定于XX:MaxTenuringThreshold设置
+        allocation1 = new byte[4 * _1MB];
+        allocation2 = new byte[4 * _1MB];
+        allocation3 = null;
+        allocation3 = new byte[4 * _1MB];
+    }
+```
+![](./pictures/MaxTenuringThreshold1.JPG)
+![](./pictures/MaxTenuringThreshold15.JPG)
 
+                                                                                                                                                                                                                                                                                                                                                                           
+### 3.8.4 动态对象年龄判定
+- 为了更好地适应不同程序的内存状况，HotSpot虚拟机并不是永远要求对象的年龄必须达到-XX:MaxTenuringThreshold才能晋升老年代，如果在Survivor空间中相同年龄所有对象大小的综合大于Survivor空间的一半，
+年龄大于或等于该年龄的对象就可以直接进入老年代，无须等到-XX:MaxTenuringThreshold中的要求的年龄。
+- 执行代码清单3-10中的testTenuringThreshold2()方法，并将设置-XX:MaxTenuringThreshold=15，发现运行结果中Survivor占用仍然为0%，而老年代比预期增加了6%，
+也就是说allocation1、allocation2对象都直接进入老年代，并没有等到15岁的临界年龄。因为这两个对象加起来已经到达了512KB，并且它们是同年龄的，满足同年对象达到Survivor空间一半的规则。
+我们只要注释掉其中一个对象的new操作，就会发现另外一个就不会晋升到老年代了。
+- 代码清单 3-7 动态对象年龄判定
+```text
+    private static final int _1MB = 1024 * 1024;
 
+    /**
+     * VM参数：-verbose:gc  -Xms20M -Xmx20M -Xmn10M -XX:+PrintGCDetails -XX:SurvivorRatio=8
+     * -XX:MaxTenuringThreshold=15 -XX:+PrintTenuringDistribution
+     */
+    @SuppressWarnings("unused")
+    public static void testTenuringThreshold2() {
+        byte[] allocation1, allocation2, allocation3, allocation4;
+        // allocation1+allocation2大于survivor空间一半
+        allocation1 = new byte[_1MB / 4];
+        allocation2 = new byte[_1MB / 4];
+        allocation3 = new byte[4 * _1MB];
+        allocation4 = new byte[4 * _1MB];
+        allocation4 = null;
+        allocation4 = new byte[4 * _1MB];
+    }
+```
+![](./pictures/TenuringThreshold2.JPG)
 
+### 3.8.5 空间分配担保
+- 在发生Minor GC之前，虚拟机必须先检查老年代最大可用的连续空间是否大于新生代所有对象总空间，如果这个条件成立，那这一次Minor GC可以确保是安全的。如果不成立，
+则虚拟机会先查看-XX:HandlePromotionFailure参数的设置值是否允许担保失败（Handle Promotion Failure）；如果允许，那会继续检查老年代最大可用的连续空间是否大于历次晋升到老年代对象的平均大小，
+如果大于，将尝试进行一次Minor GC，尽管这次Minor GC是有风险的；如果小于，或者-XX:HandlePromotionFailure设置不允许毛线，这是就要改为进行一次Full GC。
+- 解释一下”冒险“是冒了什么风险：前面提到过，新生代使用复制收集算法，但为了内存利用率，只使用其中一个Survivor空间来作为轮换备份，因此当出现大量对象在MinorGC后仍然存活的情况——
+最极端的情况就是内存回收后新生代所有对象都存活，需要老年代进行分配担保，把Survivor无法容纳的对象至今送入老年代，这与生活中贷款担保类似。老年代要进行这样的担保，
+前提是老年代本身还有容纳这些对象的剩余空间，但一共有多少对象会在这次回收中活下来在实际完成内存回收之前是无法明确知道的，所以只能取之前每一次回收晋升老年代对象容量的平均大小作为经验值，
+与老年代的剩余空间进行比较，决定是否进行Full GC来让老年代腾出更多空间。
+- 取历史平均值来比较其实仍然是一种赌概率的解决办法，也就是说加入某次Minor GC存活后的对象突增，远远高于历史平均值的话，依然会导致担保失败。如果出现了担保失败，
+那就只好老老实实地重新发起一次Full GC，这样停顿时间就很长了。虽然担保失败时绕的圈子是最大的，但通常情况下都还是会将-XX:HandlePromotionFailure开关打开，避免Full GC过于频繁。
+参见代码清单3-11，请读者现以JDK 6 Update 24之前的HotSpot运行测试代码。
+```text
+    private static final int _1MB = 1024 * 1024;
+
+    /**
+     * VM参数：-verbose:gc  -Xms20M -Xmx20M -Xmn10M -XX:+PrintGCDetails -XX:SurvivorRatio=8
+     * -XX:HandlePromotionFailure
+     */
+    @SuppressWarnings("unused")
+    public static void testHandlePromotion() {
+        byte[] allocation1, allocation2, allocation3, allocation4,
+                allocation5, allocation6, allocation7;
+        // allocation1+allocation2大于survivor空间一半
+        allocation1 = new byte[2 * _1MB];
+        allocation2 = new byte[2 * _1MB];
+        allocation3 = new byte[2 * _1MB];
+        allocation1 = null;
+        allocation4 = new byte[2 * _1MB];
+        allocation5 = new byte[2 * _1MB];
+        allocation6 = new byte[2 * _1MB];
+        allocation4 = null;
+        allocation5 = null;
+        allocation6 = null;
+        allocation7 = new byte[2 * _1MB];
+    }
+```
+![](./pictures/HandlePromotionFailureFalse.JPG)
+![](./pictures/HandlePromotionFailureTrue.png)
+
+## 本章小结
+- 本章介绍了垃圾收集的算法、若干款HotSpot虚拟机中提供的垃圾收集器的特点以及运作原理。通过代码示例验证了Java虚拟机中自动内存分配及回收的主要规则。
+- 垃圾收集器在许多场景中都是影响系统停顿时间和吞吐能力的重要因素之一，虚拟机之所以提供多种不同的收集器以及大量的调节参数，就是因为只有根据实际应用需求、
+实现方式选择最优的收集方式才能获取最好的性能。没有固定收集器、参数组合，没有最优的调优方法，虚拟机也就没有什么必然的内存回收行为。
+因此学习虚拟机内存只是，如果要到实战调优阶段，必须了解每个具体收集器的行为、优势劣势、调节参数。
 
 
 

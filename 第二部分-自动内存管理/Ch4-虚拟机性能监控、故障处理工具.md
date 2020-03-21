@@ -13,4 +13,19 @@
   但事实上它们通常都非常稳定而且功能强大，也能在处理应用程序性能问题、定位故障时发挥很大作用。
   
 ### 4.2.1 jps：虚拟机进程状况工具
-  
+- jps:可以列出正在运行的虚拟机进程，并显示虚拟机执行主类（Main Class，main()函数所在的类）名称以及这些进程的本地虚拟机唯一ID（LVMID，
+Local Virtual Machine Identifier）。
+- jps命令格式
+```text
+jps [ options ] [ hostid ]
+```
+jps执行样例
+jps -l
+```text
+jps -l                                                                                                                                                                                                                                
+1177 org.jetbrains.idea.maven.server.RemoteMavenServer36
+1481 jdk.jcmd/sun.tools.jps.Jps
+1147 
+```
+- jps还可以通过RMI协议查询开启了RMI服务的远程虚拟机进程状态，参数hostid为RMI注册表中注册的主机名。
+-

@@ -28,4 +28,60 @@ jps -l
 1147 
 ```
 - jps还可以通过RMI协议查询开启了RMI服务的远程虚拟机进程状态，参数hostid为RMI注册表中注册的主机名。
--
+
+
+### 4.2.2 jstat：虚拟机统计信息监视工具
+- jstat(JVM Statistics Monitoring Tool)是用于监视虚拟机各种运行状态信息的命令行工具。它可以显示本地或者远程虚拟机进程中的类加载、内存、
+垃圾收集、即时编译等运行时数据，在没有GUI图形界面、只提供了纯文本控制台环境的服务器上，它将是运行期定位虚拟机性能问题的常用工具。
+- jstat命令格式为：
+```text
+jstat [ option vmid [interval[s|ms] [count]] ]
+```
+- 对于命令格式中的VMID与LVMID需要特别说明一下：如果是本地虚拟机进程，VMID与LVMID是一致的；如果是远程虚拟机进程，那VMID的格式应当是：
+```text
+[protocol:][//]lvmid[@hostname[:port]/servername]
+```
+- 参数interval和count代表查询间隔和次数，如果省略这2个参数，说明只查询一次。假设需要每250毫秒查询一次进程2764垃圾收集情况，一共查询20次，
+那命令应当是：
+```text
+jstat -gc 2764 250 20
+```
+- 选项option代表用户希望查询的虚拟机信息，主要分为三类：类加载、垃圾收集、运行期编译状况。
+- jstat执行样例
+```text
+jstat -gcutil 7304
+  S0     S1     E      O      M     CCS    YGC     YGCT    FGC    FGCT    CGC    CGCT     GCT   
+  0.00  44.06  39.52  70.35  93.62  88.93    103    0.644    12    0.322     -        -    0.966
+```
+- 查询结果表明：该进程的新生代Eden（E，表示Eden）使用了39.52%的空间，2个Survivor区（S0、S1，表示Survivor0、Survivor1）分别使用了0和44.06%的空间。
+老年代（O，表示 Old）使用了70.35%的空间。程序运行以来共发生Minor GC（YGC，表示Yong GC）16次，总耗时0.644秒；发生Full GC（FGC，表示Full GC）12次，
+总耗时（FGCT，表示Full GC Time）为0.322秒；所有GC总耗时（GCT，表示 GC Time）为0.966秒。
+
+
+### 4.2.3 jinfo：Java配置信息工具 
+- jinfo（Configuration Info for Java）的作用是实时查看和调整虚拟机各项参数。jinfo的-flag选项可以查看虚拟机启动时未被显式指定的参数的系统默认值。
+jinfo还可以使用-sysprops选项把虚拟机进程的System.getProperties()的内容打印出来。
+- jinfo命令格式：
+```text
+jinfo [ option ] pid
+```
+- 执行样例：查询CMSInitiatingOccupancyFraction参数值
+```text
+jinfo -flag CMSInitiatingOccupancyFraction 7304
+-XX:CMSInitiatingOccupancyFraction=-1
+```
+
+### 4.2.4 jmap：Java内存映像工具
+- jmap（Memory Map for Java）命令用于生成堆转储快照（一般称为heapdump或dump文件）。jmap还可以查询finalize执行队列、Java堆和方法区的详细信息，
+如空间使用率、当前用的是哪种收集器等。
+- jmap命令格式：
+```text
+jmap [ option ] vmid
+```
+- 执行样例：
+```text
+ jmap -dump:format=b,file=idea.bin 7304                                                                                                                                                                       [2d5h7m] ✹ ✭
+Heap dump file created
+```
+
+

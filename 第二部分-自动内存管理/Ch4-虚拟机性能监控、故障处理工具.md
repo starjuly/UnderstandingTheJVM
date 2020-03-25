@@ -80,8 +80,25 @@ jmap [ option ] vmid
 ```
 - 执行样例：
 ```text
- jmap -dump:format=b,file=idea.bin 7304                                                                                                                                                                       [2d5h7m] ✹ ✭
+jmap -dump:format=b,file=idea.bin 7304                                                                                                                                                                       [2d5h7m] ✹ ✭
 Heap dump file created
 ```
 
 
+### 4.2.5 jhat：虚拟机堆转储快照分析工具
+- JDK提供jhat（JVM Heap Analysis Tool）命令与jmap搭配使用，来分析jmap生成的堆转储快照。jhat内置了一个微型的HTTP/Web服务器，
+生成的堆转储快照的分析结果后，可以在浏览器查看。
+- 使用jhat分析dump文件
+```text
+jhat idea.bin
+Reading from idea.bin...
+Dump file created Mon Mar 23 23:39:03 CST 2020
+Snapshot read, resolving...
+Resolving 2817601 objects...
+Chasing references, expect 563 dots......
+Eliminating duplicate references.......
+Snapshot resolved.
+Started HTTP server on port 7000
+Server is ready.
+```
+- 屏幕显示"Server is ready."的提示后，用户在浏览器中输出http://localhost:7000/可以看到分析结果。

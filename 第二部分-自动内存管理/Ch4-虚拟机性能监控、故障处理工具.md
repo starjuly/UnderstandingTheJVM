@@ -287,9 +287,10 @@ null
 
 #### 1.启动JConsole
 - 通过JDK/bin目录下的jconsole.exe启动JConsole后，会自动搜索出本机运行的所有虚拟机进程，而不需要自己使用jps来查询，如图4-10所示。
+双击选择其中一个程序便可进入主界面开始监控。JMX支持跨服务器的管理，也可以使用下面的“远程进程”功能来连接远程服务器，对远程虚拟机进行监控。
 ![JConsole连接页面](./pictures/JConsole连接页面.png)
 - 图4-10 JConsole连接页面
-双击选择其中一个程序便可进入主界面开始监控。JMX支持跨服务器的管理，也可以使用下面的“远程进程”功能来连接远程服务器，对远程虚拟机进行监控。
+
 - 图4-10看到有三个本地虚拟机进程。双击MonitoringTest进入JConsole主界面，如图4-11所示。
 ![JConsole主界面](./pictures/JConsole主界面.png)
 - 图4-11 JConsole主界面

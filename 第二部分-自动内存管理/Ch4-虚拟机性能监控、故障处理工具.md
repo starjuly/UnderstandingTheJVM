@@ -281,3 +281,67 @@ null
 
 
 
+### 4.3.2 JConsole:Java监视与管理控制台
+- JConsole（Java Monitoring and  Management Console）是一款基于JMX（Java Management Extensions)的可视化监视、管理工具。
+它的主要功能是通过JMX的MBean（Managed Bean）对系统进行信息收集和参数动态调整。
+
+#### 1.启动JConsole
+- 通过JDK/bin目录下的jconsole.exe启动JConsole后，会自动搜索出本机运行的所有虚拟机进程，而不需要自己使用jps来查询，如图4-10所示。
+![JConsole连接页面](./pictures/JConsole连接页面.png)
+- 图4-10 JConsole连接页面
+双击选择其中一个程序便可进入主界面开始监控。JMX支持跨服务器的管理，也可以使用下面的“远程进程”功能来连接远程服务器，对远程虚拟机进行监控。
+- 图4-10看到有三个本地虚拟机进程。双击MonitoringTest进入JConsole主界面，如图4-11所示。
+![JConsole主界面](./pictures/JConsole主界面.png)
+- 图4-11 JConsole主界面
+#### 2.内存监控
+- "内存"页签的作用相当于可视化的jstat命令，用于监视被收集器管理的虚拟机内存（被收集器直接管理的Java堆和被间接管理的方法区）的变化趋势。
+我们通过运行代码清单4-7中的代码来体验一下它的监视功能。运行时设置的虚拟机参数为：
+```text
+-Xms100m -Xmx100m -XX:+UseSerialGC
+```
+- 代码清单4-7 JConsole监视代码
+```java
+/**
+ * 内存占位符对象，一个OOMObject大约占64KB
+ */
+public class MonitoringTest {
+    static class OOMObject {
+        public byte[] placeholder = new byte[64 * 1024];
+    }
+
+    public static void fillHeap(int num) throws InterruptedException {
+        List<OOMObject> list = new ArrayList<>();
+        for (int i = 0; i < num; i++) {
+            // 稍作延迟，令监视器的变化更加明显
+            Thread.sleep(50);
+            list.add(new OOMObject());
+        }
+        System.gc();
+    }
+
+    public static void main(String[] args) throws Exception {
+        fillHeap(1000);
+    }
+}
+```
+
+- 这段代码的作用是以64KB/50ms的速度向Java堆中填充数据，一共填充1000次，使用JConsole的“内存”页签进行监视，观察曲线和柱状指示图的变化。
+- 程序运行后，在“内存”页签中可以看到内存池Eden区的运行趋势呈现折线状，如图4-12所示。监视范围扩大到整个堆后，会发现曲线是一直平滑增长的。
+从柱状图可以看到，在1000次循环执行结束，运行了System.gc后，虽然整个新生代Eden区基本被清空了，但是代表老年代的柱状图仍然保持峰值状态，
+说明被填充进堆中的数据在System.gc()方法执行之后仍然存活。
+![Eden区内存变化状况](./pictures/Eden区内存变化状况.png)
+- 图4-12 Eden区内存变化状况
+
+
+
+
+
+
+
+
+
+
+
+
+
+

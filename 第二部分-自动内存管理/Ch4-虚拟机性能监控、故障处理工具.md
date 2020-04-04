@@ -102,3 +102,182 @@ Started HTTP server on port 7000
 Server is ready.
 ```
 - 屏幕显示"Server is ready."的提示后，用户在浏览器中输出http://localhost:7000/可以看到分析结果。
+
+
+### 4.2.6 jstack：Java堆栈跟踪工具
+- jstack（Stack Trace for Java）命令用于生成虚拟机当前时刻的线程快照（一般称为threaddump或者javacore文件）。
+线程快照就是当前虚拟机内每一条线程正在执行的方法堆栈的集合，生成线程快照的目的通常是定位线程出现长时间停顿的原因，如线程间死锁、死循环、
+请求外部资源导致的长时间挂起等，都是导致线程长时间停顿的常见原因。线程出现停顿时通过jstack来查看各个线程的调用堆栈，
+就可以获知没有响应的线程到底在后台做些什么事情，或者等待着什么资源。
+- jstack命令格式：
+```text
+jstack [ option ] vmid
+```
+- 
+- 代码清单4-4 使用jstack查看线程堆栈（部分结果）
+```text
+jstack -l 6275                                                              ⏎
+2020-03-26 22:43:04
+Full thread dump OpenJDK 64-Bit Server VM (25.152-b39 mixed mode):
+
+"rebel-notifications-queue-1" #57 daemon prio=5 os_prio=31 tid=0x00007ff24a70a000 nid=0x959f waiting on condition [0x0000700009845000]
+   java.lang.Thread.State: TIMED_WAITING (parking)
+	at sun.misc.Unsafe.park(Native Method)
+	- parking to wait for  <0x00000007a59095c0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:1093)
+	at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:809)
+	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1067)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1127)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+	at java.lang.Thread.run(Thread.java:745)
+
+   Locked ownable synchronizers:
+	- None
+```
+- 从JDK5起，java.lang.Thread类新增了一个getAllStackTraces()方法用于获取虚拟机中所有线程的StackTraceElement对象。
+使用这个方法可以通过简单的几行代码完成jstack的大部分功能，在实际项目中不妨调用这个方法做个管理员页面，可以随时使用浏览器来查看线程堆栈，
+如代码清单4-5所示。
+- 代码清单4-5 查看线程状况的JSP页面
+```text
+<%@ page import="java.util.Map"%>
+
+<html>
+<head>
+    <title>服务器线程信息</title>
+</head>
+<body>
+<pre>
+    <%
+        for (Map.Entry<Thread, StackTraceElement[]> stackTrace : Thread.getAllStackTraces().entrySet()) {
+            Thread thread = (Thread) stackTrace.getKey();
+            StackTraceElement[] stack = stackTrace.getValue();
+            if (thread.equals(Thread.currentThread())) {
+                continue;
+            }
+            out.print("\n线程："  + thread.getName() + "\n");
+            for (StackTraceElement element : stack) {
+                out.print("\t" + element + "\n");
+            }
+        }
+    %>
+</pre>
+</body>
+</html>
+```
+
+### 4.3.1 JHSDB：基于服务性代理的调试工具
+- JHSDB是一款基于服务性代理实现的进程外调试工具。服务性代理是HotSpot虚拟机虚拟机中一组用于映射Java虚拟机运行信息的、主要基于Java语言（含少量JNI代码）实现的API集合。
+服务性代理以HotSpot内部的数据结构为参照物进行设计，把这些C++的数据抽象出Java模型对象，相当于HotSpot的C++代码的一个镜像。
+通过服务性代理的API，可以在一个独立的Java虚拟机的进程里分析其他HotSpot虚拟机的内部数据，或者从HotSpot虚拟机进程内存中dump出来的转储快照里还原出它的运行状态细节。
+本次借助JHSDB来分析一下代码清单4-6中的代码，并通过实验来回答一个简单问题：staticObj、instanceObj、localObj这三个变量本身（而不是它们所指向的对象）存放在哪里？
+- 代码清单4-6 JHSDB测试代码
+```java
+/**
+ * staticObj、instanceObj、localObj存放在哪里？
+ */
+public class JHSDB_TestCase {
+
+    static class Test {
+        static ObjectHolder staticObj = new ObjectHolder();
+        ObjectHolder instanceObj = new ObjectHolder();
+
+        void foo() {
+            ObjectHolder localObj = new ObjectHolder();
+            System.out.println("done"); // 设置一个断点
+        }
+    }
+
+    private static class ObjectHolder {}
+
+    public static void main(String[] args) {
+        Test test = new JHSDB_TestCase.Test();
+        test.foo();
+    }
+}
+```
+
+- 通过前面两张学习的理论知识得出，staticObj随着Test的类型信息存放在方法区，instanceObj随着Test的对象实例存放在Java堆，
+localObj则是存放在foo()方法栈帧的局部变量表中。现在通过JHSDB来实践验证这一点。
+- 首先，要确保这三个变量已经在内存中分配好，然后将程序暂停下来，一遍有空隙进行实验，这只要把断电设置在代码中加粗的打印语句上，
+然后在调试模式下运行程序即可。为了后续操作时可以加快在内存中搜索对象的速度，建议限制一下Java堆的大小。
+本例中，采用的运行参数如下：
+```text
+-Xmx10m -XX:+UseSerialGC -XX:-UseCompressedOops
+```
+- 程序执行后通过jps查询到测试程序的进程ID，具体如下：
+```text
+ jps -l
+2032 jdk.jcmd/sun.tools.jps.Jps
+1492 org.jetbrains.idea.maven.server.RemoteMavenServer36
+2022 org.jetbrains.jps.cmdline.Launcher
+2023 ch3.JHSDB_TestCase
+1471 
+```
+- 使用以下命令进入JHSDB的图形化模式，并使其附加进程2023：
+```text
+jhsdb hsdb --pid 2023
+```
+- 命令打开的JHSDB的界面如图4-4所示。
+![JHSDB的界面](./pictures/JHSDB.png)
+- 图4-4 JHSDB的界面
+
+- 阅读代码清单4-6可知，运行至断点位置一共会创建三个ObjectHolder对象的实例，只要是对象实例必然会在Java堆中分配，从这三个对象开始着手，
+先把它们从Java堆中找出来。
+- 首选in点击菜单中的Tools -> Heap Parameters，结果如图4-5所示，因为运行参数中指定了使用的是Serial收集器，图中我们看到了典型的Serial的分代内存布局，
+Heap Parameters窗口中清楚列出了新生代的Eden、S1、S2和老年代的容量（单位为字节）以及它们的虚拟内存地址的起止范围。
+![Serial收集器的堆布局](./pictures/HeadParameters.png)
+- 图4-5 Serial收集器的堆布局
+
+- 注意图中各个区域的内容地址范围，后面还要用到它们。打开Windows -> Console 窗口，
+使用scanoops命令在Java堆的新生代（从Eden起始地址到To Survivor结束地址）范围内查找ObjectHolder的实例，结果如下所示：
+```text
+hsdb>scanoops 0x0000000103c00000 0x0000000103f50000 JHSDB_TestCase$ObjectHolder
+0x0000000103e97bb8 ch3/JHSDB_TestCase$ObjectHolder
+0x0000000103e97be0 ch3/JHSDB_TestCase$ObjectHolder
+0x0000000103e97bf0 ch3/JHSDB_TestCase$ObjectHolder
+```
+- 果然找到了三个实例的地址，而且它们的地址都落到了Eden的范围之内，算是顺带验证了一般情况下新对象在Eden中创建的分配规则。
+再使用Tools -> Inspector功能确认一下这三个地址中存放的对象，结果如图4-6所示。
+![查看对象实例数据](./pictures/insepector.png)
+- 图4-6 查看对象实例数据
+
+- Inspector展示了对象头和指向对象元数据的指针，里面包括了Java类型的名字、继承关系、实现接口关系，字段信息、方法信息、运行时常量池的指针、
+内嵌的虚方法表（vtable）以及接口方法表（itable）等。
+- 接下来要根据堆中对象实例地址找出引用它们的指针，使用如下命令：
+```text
+hsdb> revptrs 0x0000000103e97bb8
+null
+Oop for java/lang/Class @ 0x0000000103e96388
+```
+- 找到了一个引用该对象的地方，是在一个java.lang.Class的实例里，并且给出了这个实例的地址，通过Inspector查看该对象实例，
+可以清楚看到这确实是一个java.lang.Class类型的对象实例，里面有一个名为staticObj的实例字段，如图4-7所示。
+![Class对象](./pictures/staticObj.png)
+- 图4-7 Class对象
+
+- 接下来继续查找第二个对象实例：
+```text
+hsdb> revptrs 0x0000000103e97be0
+Oop for JHSDB_TestCase$Test @ 0x0000000103e97bc8
+```
+- 这次找到一个类型为JHSDB_TestCase$Test的对象实例，在Inspector中该对象实例显示如图4-8所示。
+![Class对象](./pictures/Test.png)
+- 图4-8 JHSDB_TestCase$Test对象
+
+- 这个结果完全符合预期，第二个ObjectHolder的指针是在Java堆中JHSDB_TestCase$Test对象的instanceObj字段上。
+但是采用相同方法查找第三个ObjectHolder实例时，JHSDB返回了一个null，表示未查找到任何结果。
+```text
+hsdb> revptrs 0x0000000103e97bf0
+null
+```
+- 看来revptrs命令并不支持查找栈上的指针引用，不过因为测试代码足够简洁，可以人工完成这件事情。
+在Java Thread窗口中main线程后点击Stack Memory按钮查看该线程的内存，如图4-9所示。
+![main线程的栈内存](./pictures/JavaThread.png)
+- 图4-9 main线程的栈内存
+
+- 这个线程只有两个方法栈帧，尽管没有查找功能，但通过肉眼观察在地址   上的值正好就是0x0000000103e97bf0，而且JHSDB在旁边已经自动生成注释，
+说明这里确实是引用了一个来自新生代的JHSDB_TestCase$ObjectHolder对象。
+
+
+

@@ -335,6 +335,58 @@ public class MonitoringTest {
 
 
 
+#### 3.线程监控
+- 如果说JConsole的"内存"页签相当于可视化的jstat命令的话，那"线程"页签的功能就相当于可视化的jstack命令了，
+遇到线程停顿的时候可以使用这个页签的功能进行分析。前面讲解jstack命令时提到线程长时间停顿的主要原因有等待外部资源
+（数据库资源、网络资源、设备资源等）、死循环、锁等待等，代码清单4-8将分别演示这几种情况：
+- 代码清单4-8 线程等待演示代码
+```java
+     /**
+     * 线程死循环演示
+     */
+    public static void createBusyThread() {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    ;
+                }
+            }
+        }, "testBusyThread");
+        thread.start();
+    }
+    
+    /**
+     * 线程锁等待演示
+     */
+    public static void createLockThread(final Object lock) {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }, "testLockThread");
+        thread.start();
+    }
+    
+    
+    public static void main(String[] args) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        br.readLine();
+        createBusyThread();
+        br.readLine();
+        Object obj = new Object();
+        createLockThread(obj);
+    }
+```
+
+
 
 
 

@@ -446,10 +446,10 @@ public class MonitoringTest {
 - 图4-16 线程死锁
 
 
-#### 4.3.3 VisualVM：多合-故障处理工具
+### 4.3.3 VisualVM：多合-故障处理工具
 - VisualVM（All-in-One Java Troubleshooting Tool）是功能最强大的运行监视和故障处理程序之一。
 
-##### 1.VisualVM兼容范围与插件安装
+#### 1.VisualVM兼容范围与插件安装
 - VisualVM基于NetBeans平台开发工具，所以一开始它就具备了通过插件扩展功能的能力，有了插件扩展支持，VisualVM可以做到：
   - 显示虚拟机进程以及进程的配置、环境信息（jps、jinfo）。
   - 监视应用程序的处理器、垃圾收集、堆、方法区以及线程的信息（jstat、jstack）。

@@ -385,7 +385,78 @@ public class MonitoringTest {
         createLockThread(obj);
     }
 ```
+- 程序运行后，首先在"线程"页签中选择main线程，如图4-13所示。堆栈追踪显示BufferedReader的readBytes()方法正在等待System.in的键盘输入，
+这时候线程为Runnable状态，Runnable状态的线程仍会被分配运行时间，但readBytes()方法检查到流没有更新就会立刻归还执行令牌给操作系统，
+这种等待只消耗很小的处理器资源。
+![main线程](./pictures/main线程.png)
+- 图4-13 main线程
 
+- 接着监控testBusyThread线程，如图4-14所示。testBusyThread线程一直在执行空循环，从堆栈追踪中看到一直在MonitoringTest.java代码的41行停留，
+41行的代码为while(true)。这时候线程为Runnable状态，而且没有归还线程执行令牌的动作，所以会在空循环耗尽操作系统分配给它的执行时间，
+直到线程切换为止。
+
+![testBysyThread线程](./pictures/testBysyThread线程.png)
+- 图4-14 testBysyThread线程
+
+- 图4-15显示testLockThread线程在等待lock对象的notify()或notifyAll()方法的出现，线程这时候处于WAITING状态，
+在重新唤醒前不会被分配执行时间。
+
+![testLockThread线程](./pictures/testLockThread线程.png)
+- 图4-14 testLockThread线程
+
+- testLockThread线程正处于正常的活锁等待中，只要lock对象的notify()或notifyAll()方法被调用，这个线程便能激活继续执行。
+代码清单4-9演示了一个无法再被激活的死锁等待。
+```java
+    /**
+     * 线程死锁等待演示
+     */
+    static class SynAddRunable implements Runnable {
+
+        int a, b;
+        public SynAddRunable(int a, int b) {
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        public void run() {
+            synchronized (Integer.valueOf(a)) {
+                synchronized (Integer.valueOf(b)) {
+                    System.out.println(a + b);
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        for (int i = 0; i < 100; i++) {
+            new Thread(new SynAddRunable(1, 2)).start();
+            new Thread(new SynAddRunable(2, 1)).start();
+        }
+    }
+```
+
+- 这段代码运行后会遇到线程死锁。造成死锁的根本原因是Integer.valueOf()方法出于减少对象创建次数和节省内存的考虑，
+会对数值为-128 ~ 127之间的Integer对象进行缓存，如果valueOf()方法传入的参数在这个方位之内，就直接返回缓存中的对象。
+也就是说代码中尽管调用了200次Integer.valueOf()方法，但一共只返回了两个不同的Integer对选哪个。
+假如某个线程的两个synchronized快之间发生了一次线程切换，那就会出现线程A在等待线程B持有的Integer.valueOf()，
+线程B又在等待被线程A持有的Integer.valueOf()，结果大家都跑不下去的情况。
+- 出现线程死锁之后，点击JConsole线程面板的“检测死锁”按钮，将出现一个新的“死锁”页签，如图4-16所示。
+![线程死锁](./pictures/线程死锁.png)
+- 图4-16 线程死锁
+
+
+#### 4.3.3 VisualVM：多合-故障处理工具
+- VisualVM（All-in-One Java Troubleshooting Tool）是功能最强大的运行监视和故障处理程序之一。
+
+##### 1.VisualVM兼容范围与插件安装
+- VisualVM基于NetBeans平台开发工具，所以一开始它就具备了通过插件扩展功能的能力，有了插件扩展支持，VisualVM可以做到：
+  - 显示虚拟机进程以及进程的配置、环境信息（jps、jinfo）。
+  - 监视应用程序的处理器、垃圾收集、堆、方法区以及线程的信息（jstat、jstack）。
+  - dump以及分析堆转储快照（jmap、jbat）。
+  - 方法级的程序运行性能分析，找出被调用最多、运行时间最长的方法。
+  - 离线程序快照：收集程序的运行时配置、线程dump、内存dump等信息建立一个快照，可以将快照发送开发者处进行Bug反馈。
+  - 其他插件带来的无限可能性。
 
 
 

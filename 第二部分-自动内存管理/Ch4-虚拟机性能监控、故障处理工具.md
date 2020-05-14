@@ -458,6 +458,124 @@ public class MonitoringTest {
   - 离线程序快照：收集程序的运行时配置、线程dump、内存dump等信息建立一个快照，可以将快照发送开发者处进行Bug反馈。
   - 其他插件带来的无限可能性。
 
+- VisualVM的插件可以手工进行安装，在网站上下载nbm包后，点击"工具->插件->已下载"菜单，然后再弹出对话框中指定nbm包路径便可完成安装。
+VisualVM的自动安装已可找到大多数所需的插件，在有网络连接的环境下，点击“工具->插件菜单”，弹出如图4-17所示的插件页签，
+在页签的“可用插件”及“已安装”中列举了当前版本VisualVM可以使用的全部插件，选中插件后在右边窗口会显示这个插件的基本信息，
+如开发者、版本、功能描述等。
+![VisualVM插件页签](./pictures/VisualVM插件页签.png)
+- 图4-17 线程死锁
+
+
+- 读者可根据自己的工作需要和兴趣选择合适的插件，然后点击“安装”按钮，弹出如图4-18所示的下载进度窗口，
+跟着提示操作即可完成安装。
+![VisualVM插件安装过程](./pictures/VisualVM插件安装过程.png)
+- 图4-18 VisualVM插件安装过程
+
+- 选择一个需要监视的程序就可以进入程序的主界面了，如图4-19所示。由于VisualVM的版本以及选择安装插件数量的不同，
+页签可能有所差别。
+![VisualVM主界面](./pictures/VisualVM主界面.png)
+- 图4-19 VisualVM主界面
+
+
+#### 2.生成、浏览堆转储快照
+- 在VisualVM中生成堆转储快照文件有两种方式，可以执行下列任一操作：
+  - 在“应用程序”窗口中右键单击应用程序节点，然后选择“dump”。
+  - 在“应用程序”窗口中双击应用程序节点一打开应用程序标签，然后在”监视“标签中单击”堆Dump“。
+- 生成堆转储快照文件之后，应用程序页签会在该堆的应用程序下增加一个以[heap-dump]开头的子节点，并且在主页签中打开该转储快照，
+如图4-20所示。如果需要把堆转储快照保存或发送出去，就应在heapdump节点上右键选择”另存为“菜单，否则当VisualVM关闭时，
+生成的堆转储快照文件会被当做临时文件自动清理掉。要打开一个由已经存在的堆转储快照文件，通过文件菜单的”装入“功能，选择硬盘上的文件即可。
+![浏览dump文件](./pictures/浏览dump文件.png)
+- 图4-20 浏览dump文件
+
+
+- 堆页签中的”摘要“面板可以看到应用程序dump时的运行参数、System.getProperties()的内容、线程堆栈等信息：”类“面板则是以类为统计口径统计类的实例数量、
+容量信息；”实例“面板不能直接使用，因为VisualVM在此时还无法确定用户想查看哪个类的实例，所以需要通过”类“面板进入，在”类“中选择一个需要查看的类，
+然后双击即可在”实例“里面看到此类的其中500个实例的具体属性信息；“OOL控制台”面板则是运行OOL查询语句的，同jhat中介绍的OOL功能一样。
+
+
+#### 3.分析程序性能
+- 在Profiler页签中，VisualVM提供了程序运行期间方法级的处理器执行时间分析以及内存分析。
+- 要开始性能分析，先选择“CPU”和“内存”按钮中的一个，然后切换到应用程序中对程序进行操作，VisualVM会记录这段时间中应用程序执行过的所有方法。
+如果是进行处理器执行时间分析，将会统计每个方法的执行次数、执行耗时；如果是内存分析，则会统计每个方法关联的对象以及这些对象所占的空间。
+等要分析的操作执行结束后，点击“停止”按钮结束监控过程、如图4-21所示。
+![对应用程序进行CPU执行时间分析](./pictures/对应用程序进行CPU执行时间分析.png)
+- 图4-21 对应用程序进行CPU执行时间分析
+
+#### 4.BTrace动态日志跟踪
+- BTrace是一个很神奇的VisualVM插件，它本身也是一个可运行的独立程序。BTrace的作用是在不中断目标程序运行的前提下，
+通过HotSpot虚拟机的Instrument功能动态加入原本不存在的调试代码。这项功能对实际中的程序很有意义：如当程序出现问题时，
+排查错误的一些必要信息时（譬如方法参数、返回值等），在开发时并没有打印日志之中以至于不得不停掉服务时，都可以通过调试增量来加入日志代码一解决问题。
+- 在VisualVM中安装了BTrace插件后，在应用程序面板中右击要调试的程序，会出现“Trace Application...”菜单，点击将进入BTrace面板。
+这个面板看起来就像一个简单的Java程序开发环境，里面甚至已经有了一小段Javad代码，如图4-22所示。
+![BTrace动态追踪](./pictures/BTrace动态追踪.png)
+- 图4-22 BTrace动态追踪
+
+- 现有一段简单的Java代码来演示BTrace的功能：产生两个1000以内的随机整数，输出这两个数字相加的结果，如代码清单4-10所示。
+- 代码清单4-10 BTrace跟踪演示
+```java
+public class BTraceTest {
+
+    public int add(int a, int b) {
+        return a + b;
+    }
+
+    public static void main(String[] args) throws IOException {
+        BTraceTest test = new BTraceTest();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        for (int i = 0; i < 10; i++) {
+            reader.readLine();
+            int a = (int) Math.round(Math.random() * 1000);
+            int b = (int) Math.round(Math.random() * 1000);
+            System.out.println(test.add(a, b));
+        }
+    }
+}
+```
+
+- 现在想要知道程序中生成的两个随机数是什么，但程序并没有在执行过程中输出这一点。此时，在VisualVM中打开该程序的监视，
+在BTrace页签填充TracingScript的内容，输入调试代码，如图清单4-11所示，即可在不中断程序运行的情况下做到这一点。
+- 代码清单 4-11 BTrace调试代码
+```java
+/* BTrace Script Template */
+import com.sun.btrace.annotations.*;
+import static com.sun.btrace.BTraceUtils.*;
+
+@BTrace
+public class TracingScript {
+    @OnMethod(
+  clazz="ch3.BTraceTest",
+  method="add",
+  location=@Location(Kind.RETURN)
+)
+
+public static void func(@Self ch3.BTraceTest instance, int a, int b,
+ @Return int result) {
+  println("调用堆栈：");
+  jstack();
+  println(strcat("方法参数A：", str(a)));  
+  println(strcat("方法参数B：", str(b)));
+  println(strcat("方法参数结果：", str(result)));  
+}
+}
+```
+
+- 点击Start按钮后稍等片刻，编译完成后，Output面板中会出现“BTrace code successfully deployed”的字样。
+当程序运行时将会在Output面板输出如图4-23所示的调试信息。
+![BTrace跟踪结果](./pictures/BTrace跟踪结果.png)
+- 图4-23 BTrace跟踪结果
+
+- BTrace的用途很广发，打印调用堆栈、参数、返回值只是它最基础的使用形式，在它的网站上有使用BTrace进行性能监视、
+定位连接泄漏、解决多线程竞争问题等的使用案例。
+- BTrace能够实现动态修改程序行为，是因为它是基于Java虚拟机的Instrument开发的。Instrument是Java虚拟机工具接口的重要组件，
+提供了一套代理（Agent）机制，使得第三方工具程序可以以代理的方式访问和修改Java虚拟机的内部的数据。
+阿里巴巴开源的诊断工具Arthas也通过Instrument实现了与BTrace类似的功能。
+
+
+
+
+
+
+
 
 
 

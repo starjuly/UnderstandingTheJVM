@@ -619,13 +619,63 @@ Oracle特别强调它”可持续在线“的特性。JFR在JFR在生产环境�
 并通过这些数据进行性能分析。
 
 
+## 4.4 HotSpot虚拟机插件及工具
+- 在HotSpot虚拟机的研发过程中，开发团队曾经编写过不少虚拟机的插件和辅助工具。它们存放在HotSpot源码hotspot/src/share/tools目录下，包括：
+  - Ideal Graph Visualizer：用于可视化展示C2即时编译器是如何将字节码转化为理想图，然后转化为机器码的。
+  - Client Compiler Visualizer：用户查看C1即时编译器生成高级中间表示（HIR），转换成低级中间表示（LIR）和物理寄存器分配的过程。
+  - MakeDeps：帮助处理HotSpot的编译依赖的工具。
+  - Project Creator：帮忙生成Visual Studio的project文件的工具。
+  - LogCompilation：将-XX:+LogCompilation输出的日志整理成更容易阅读的格式的工具。
+  - HSDIS：即时编译器的反汇编组件。
+
+### HSDIS：JIT生成代码反汇编
+- HSDIS是一个被官方推荐的HotSpot虚拟机即时编译代码的反汇编插件，它包含在一个HotSpot虚拟机的源码当中。
+- HSDIS插件的作用是让HotSpot的-XX:+PrintAssembly指令调用它来把即时编译器动态生成的本地代码还原为汇编代码输出，
+同事还会自动产生大量非常有价值的注释，这样我们就可以通过输出的汇编代码来从最本质的角度分析问题。笔者以代码清单4-12中的测试代码为例简单演示一下如何使用这个插件。
+- 代码清单4-12 测试代码
+
+```java
+public class Bar {
+    int a = 1;
+    static int b = 2;
+
+    public int sum(int c) {
+        return a + b + c;
+    }
+
+    public static void main(String[] args) {
+        new Bar().sum(3);
+    }
+}
+```
+- 编译这段代码，并使用以下命令执行。如果使用的是Product版的HotSpot，则还需要加入一个-XX:+UnlockDiagnosticVMOptions参数才可以工作。
+
+```text
+ java -XX:+PrintAssembly -Xcomp -XX:CompileCommand=dontinline, *Bar.sum -XX:CompileCommand=compileonly,*Bar.sum test.Bar
+```
+- 其中，参数-Xcomp是让虚拟机以编译模式执行代码，这样不需要执行足够次数来预热就能触发即使编译。
+两个-XX:CompileCommand的意思是让编译器不要内联sum()并且只编译sum(),-XX:+PrintAssembly就是输出反汇编内容。
 
 
+- JITWatch是HSIDS经常搭配使用的可视化的编译日志分析工具，为便于在JITWatch中读取，
+读者可使用以下参数把日志输出到logfile文件：
+```text
+ -XX:+UnlockDiagnosticVMOptions 
+ -XX:+TraceClassLoading 
+ -XX:+LogCompilation 
+ -XX:LogFile=/tmp/logfile.log 
+ -XX:+PrintAssembly 
+ -XX:+TraceClassLoading  
+```
+
+- 在JITWatch中加载日志后，就可以看到执行期间使用过的各种类型和对应调用过的方法了，界面如图4-28所示。
+![JITWatch主界面](./pictures/JITWatch主界面.png)
+- 图4-28 JITWatch主界面
 
 
-
-
-
+- 选择想要查看的类和方法，即可查看对应的Java源代码、字节码和即时编译器生成的汇编代码，如图4-29所示。
+![查看方法代码](./pictures/查看方法代码.png)
+- 图4-29 查看方法代码
 
 
 

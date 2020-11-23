@@ -131,3 +131,30 @@ public class Test {
     static int i = 1;
 }
 ```
+  - <clinit>()方法与类的构造函数（即在虚拟机视角中的实例构造器<init>()方法）不同，它不需要显式地调用父类构造器，
+  Java虚拟机会保证在子类的<clinit>()方法执行前，父类的<clinit>()方法已经执行完毕。
+  因此在Java虚拟机中第一个被执行的<clinit>()方法的类型肯定是java.lang.Object。
+  - 由于父类的<clinit>()方法先执行，也就意味着父类中定义的静态语句块要优先于类的变量赋值操作，如代码清单7-6中，
+  字段B的值将会是2而不是1。
+- 代码清单7-6 <clinit>()方法执行顺序
+```java
+ static class Parent {
+    public static int A = 1;
+
+    static {
+        A = 2;
+    }
+}
+
+static class Sub extends Parent {
+    public static int B = A;
+}
+
+public static void main(String[] args) {
+    System.out.println(Sub.B);
+}
+```
+  - <clinit>()方法对于类或接口来说并不是必需的，如果一个类中没有静态语句块，也没有对变量的赋值操作，那么编译器可以不为这个类生成<clinit>()方法。
+  - 接口中不能使用静态语句块，但仍然有变量初始化的赋值操作，因此接口与类一样都会生成<clinit>()方法。但接口与类不同的是，
+  执行接口的<clinit>()方法不需要先执行父接口的<clinit>()方法，因为只有当父接口中定义的变量被使用时，父接口才会被初始化。
+  此外，接口的实现类在初始化时也一样不会执行接口的<clinit>()方法。

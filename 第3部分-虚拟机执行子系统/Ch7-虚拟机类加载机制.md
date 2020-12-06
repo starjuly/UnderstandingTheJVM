@@ -158,3 +158,45 @@ public static void main(String[] args) {
   - 接口中不能使用静态语句块，但仍然有变量初始化的赋值操作，因此接口与类一样都会生成<clinit>()方法。但接口与类不同的是，
   执行接口的<clinit>()方法不需要先执行父接口的<clinit>()方法，因为只有当父接口中定义的变量被使用时，父接口才会被初始化。
   此外，接口的实现类在初始化时也一样不会执行接口的<clinit>()方法。
+  - Java虚拟机必需保证一个类的<clinit>()方法在多线程环境中被正确地加锁同步，如果多个线程同时去初始化一个类，
+  那么只会有其中一个线程去执行这个类的<clinit>()方法，其他线程都需要阻塞等待，直到活动线程执行完毕<clinit>()方法。
+  如果在一个类中的<clinit>()方法中有耗时较长的操作，那就可能造成多个进程阻塞，在实际应用中这种阻塞往往是很隐蔽的。
+  代码清单7-7演示了这种场景。
+- 代码清单7-7 字段解析
+```java
+public class DeadLoopClass {
+    static {
+        // 如果不加上这个 if 语句，编译器提示"Initializer must be able to complete normally"并拒绝编译
+        if (true) {
+            System.out.println(Thread.currentThread() + "init DeadLoopClass");
+            while (true) {
+
+            }
+        }
+    }
+}
+
+class DeadLoopClassTest {
+    public static void main(String[] args) {
+        Runnable script = new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(Thread.currentThread() + "start");
+                DeadLoopClass dlc = new DeadLoopClass();
+                System.out.println(Thread.currentThread() + "run over");
+            }
+        };
+
+        Thread thread1 = new Thread(script);
+        Thread thread2 = new Thread(script);
+        thread1.start();
+        thread2.start();
+    }
+}
+```
+- 运行结果如下，一条线程在死循环以模拟长时间操作，另外一条线程在阻塞等待：
+```text
+Thread[Thread-1,5,main]start
+Thread[Thread-0,5,main]start
+Thread[Thread-1,5,main]init DeadLoopClass
+```

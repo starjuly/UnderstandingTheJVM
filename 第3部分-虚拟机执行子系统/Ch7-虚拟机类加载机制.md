@@ -255,3 +255,66 @@ false
 但在第二行的输出中却发现这个对象与类org.fenixsoft.classloading.ClassLoaderTest所属类型检查的时候返回了false。
 这是因为Java虚拟机中同时存在了两个ClassLoaderTest类，一个是由虚拟机的应用程序类加载器所加载的，另外一个是由我们自定义的类加载器加载的，
 虽然它们都来自同一个Class文件，但在Java虚拟机中仍然是两个相互独立的类，做对象所属类型检查时的结果自然为false。
+
+
+### 7.4.2 双亲委派模型
+- 本节内容将针对JDK8及之前版本的Java来介绍什么事三层类加载器，以及什么是双亲委派模型。对于这个时期的Java应用，
+绝大多数Java程序都会使用到以下3个系统提供的类加载器进行加载。
+  - 启动类加载器：这个类加载器负责加载存放在<JAVA_HOME>\lib目录，或者被-Xbootclasspath参数所指定的路径中存放的，
+  而且是Java虚拟机能够识别的类库加载到虚拟机的内存中。启动类加载器无法被Java程序直接引用，用户在编写自定义类加载器时，
+  如果需要把加载请求委派给引导类加载器去处理，那直接使用null代替即可。
+  - 扩展类加载器：这个类加载器是在类sun.misc.Launcher$ExtClassLoader中以Java代码的形式实现的。它负责加载<JAVA_HOME>\lib\ext目录中，
+  或者被java.ext.dirs系统变量所指定的路径中所有的类库。根据"扩展类加载器"这个名称，就可以推断这是一种Java系统类库的扩展机制。
+  由于扩展类加载器是由Java代码实现的，开发者可以直接在程序中使用扩展类加载器来加载Class文件。
+  - 应用程序类加载器：这个类加载器由sun.misc.Launcher$AppClassLoader来实现。由于应用程序类加载器是ClassLoader类中的getSystemClassLoader()方法的返回值，
+  所以有些场合中也称它为"系统类加载器"。它负责加载用户路径（ClassPath）上所有的类库，开发者同样可以直接在代码中使用这个类加载器。
+  如果应用程序中没有自定义过自己的类加载器，一般情况下这个就是程序中默认的类加载器。
+![20类加载器双亲委派模型](./pictures/图7-2%20类加载器双亲委派模型.png)
+- 图7-2 类加载器双亲委派模型
+- 图7-2中展示的各种类加载器之间的层次关系被称为类加载器的"双亲委派模型"。双亲委派模型要求除了顶层的启动类加载器外，
+其余的类加载器都应该有自己的父类加载器。不过这里类加载器之间的父子关系一般不是以继承的关系来实现的，而是通常使用组合关系来复用父加载器的代码。
+- 双亲委派模型的工作过程：如果一个类加载器收到了类加载的请求，它首先不会自己去尝试加载这个类，而是把这个请求委派给父类加载器去完成，
+每一个层次的类加载器都是如此，因此所有的加载请求最终都应该传送到最顶层的启动类加载器中，只有当父加载器反馈自己无法完成这个加载请求（它的搜索范围中没有找到所需的类）时，
+子加载器才会尝试自己去完成加载。
+- 使用双亲委派模型来组织类加载器之间的关系，一个显而易见的好处就是Java中的类随着它的类加载器一起具备了一种带有优先级的层次关系。
+例如类java.lang.Object，它存放在rt.jar之中，无论哪一个类加载器要加载这个类，最终都是委派给处于模型最顶端的启动类加载进行加载，
+因此Object类在程序的各种类加载器环境中都能够保证是同一个类。反之，如果没有使用双亲委派模型，都由各个类加载器自行去加载的话，
+如果用户自己也编写了一个名为java.lang.Object的类，并且放在程序中的ClassPath中，那系统中就会出现多个不同的Object类，
+Java类型体系中最基础的行为也就无从保证，应用程序将会变得一片混乱。
+- 双亲委派模型对于保证Java程序中的稳定运作极为重要，但它的实现却异常简单，用以实现双亲委派的代码只有短短十余行，
+全部集中在java.lang.ClassLoader的loadClass()方法之中，如代码清单7-10所示。
+```java
+ protected synchronized Class<?> loadClass(String name, boolean resolve)
+            throws ClassNotFoundException
+    {
+        // 首先，检查请求的类是否已经被加载过了
+        Class<?> c = findLoadedClass(name);
+        if (c == null) {
+            long t0 = System.nanoTime();
+            try {
+                if (parent != null) {
+                    c = parent.loadClass(name, false);
+                } else {
+                    c = findBootstrapClassOrNull(name);
+                }
+            } catch (ClassNotFoundException e) {
+                // 如果父类加载器抛出 ClassNotFoundException
+                // 说明父类加载器无法完成加载请求
+            }
+
+            if (c == null) {
+                // 在父类加载器无法加载时
+                // 再调用本身的 findClass 方法来进行类加载
+                long t1 = System.nanoTime();
+                c = findClass(name);
+
+            }
+        }
+        if (resolve) {
+            resolveClass(c);
+        }
+        return c;
+    }
+```
+- 这段代码逻辑：先检查请求加载的类型是否已经被加载过，若没有则调用父加载器的loadClass()方法，若父加载器为空则默认使用启动类加载器作为父加载器。
+加入父类加载器加载失败，抛出 ClassNotFoundException 异常的话，才调用自己的findClass()方法尝试进行加载。
